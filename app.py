@@ -29,7 +29,25 @@ def sediakan_database():
             tarikh TEXT
         )
     """)
+    cursor = conn.cursor()
 
+    lajur = [
+        "kekuatan",
+        "semakan_fakta",
+        "cadangan"
+    ]
+
+    lajur_sedia_ada = [
+        row[1] for row in cursor.execute(
+            "PRAGMA table_info(rekod)"
+        ).fetchall()
+    ]
+
+    for nama_lajur in lajur:
+        if nama_lajur not in lajur_sedia_ada:
+            cursor.execute(
+                f"ALTER TABLE rekod ADD COLUMN {nama_lajur} TEXT"
+            )
     conn.commit()
     conn.close()
 
@@ -328,8 +346,9 @@ bahawa semua fakta telah disahkan secara menyeluruh.
                 cursor.execute("""
                     INSERT INTO rekod
                     (nama_kumpulan, tajuk_lagu, subtopik, markah,
-                    fakta, kelengkapan, kreativiti, susunan, tarikh)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    fakta, kelengkapan, kreativiti, susunan, tarikh,
+                    kekuatan, semakan_fakta, cadangan)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     nama_kumpulan,
                     tajuk_lagu,
@@ -339,7 +358,10 @@ bahawa semua fakta telah disahkan secara menyeluruh.
                     markah["kelengkapan"],
                     markah["kreativiti"],
                     markah["susunan"],
-                    datetime.now().strftime("%Y-%m-%d %H:%M")
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "\n".join(keputusan.get("kekuatan", [])),
+                    "\n".join(keputusan.get("semakan_fakta", [])),
+                    "\n".join(keputusan.get("cadangan", []))
                 ))
 
                 conn.commit()
@@ -474,10 +496,11 @@ if peranan == "Guru":
         conn = sqlite3.connect("sejarah_beat.db")
 
         rekod = conn.execute("""
-            SELECT nama_kumpulan, tajuk_lagu, subtopik, markah, tarikh
-            FROM rekod
-            ORDER BY markah DESC, id DESC
-        """).fetchall()
+           SELECT nama_kumpulan, tajuk_lagu, subtopik, markah, tarikh,
+           kekuatan, semakan_fakta, cadangan
+           FROM rekod
+           ORDER BY markah DESC, id DESC
+           """).fetchall()
 
         conn.close()
 
@@ -521,6 +544,42 @@ if peranan == "Guru":
                 data=csv,
                 file_name="rekod_keputusan_sejarah_beat_ai.csv",
                 mime="text/csv"
+            )
+
+            st.divider()
+            st.subheader("📢 PAPARAN MAKLUM BALAS AI")
+
+            pilihan = st.selectbox(
+                "Pilih kumpulan untuk memaparkan komen:",
+                range(len(rekod)),
+                format_func=lambda i: (
+                    f"{rekod[i][0]} - {rekod[i][1]}"
+                )
+            )
+
+            kumpulan = rekod[pilihan]
+
+            st.markdown(f"## 🏺 {kumpulan[0]}")
+            st.write("Tajuk lagu:", kumpulan[1])
+            st.metric("Markah keseluruhan", f"{kumpulan[3]}/100")
+
+            with st.container(border=True):
+                st.subheader("🌟 Kekuatan Lirik")
+                st.write(kumpulan[5] or "Tiada komen.")
+
+                st.divider()
+
+                st.subheader("🔎 Semakan Fakta Sejarah")
+                st.write(kumpulan[6] or "Tiada komen.")
+
+                st.divider()
+
+                st.subheader("💡 Cadangan Penambahbaikan")
+                st.write(kumpulan[7] or "Tiada komen.")
+
+            st.info(
+                "Guru boleh menggunakan paparan ini "
+                "semasa sesi perbincangan bersama murid."
             )
 
         else:
